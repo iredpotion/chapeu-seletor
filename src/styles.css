@@ -1,0 +1,601 @@
+/* =========================================================================
+   O CHAPEU SELETOR - Folha de estilos
+   Layout pensado para ficar POR CIMA do video do Salao Principal:
+   conteudo no topo e na base, centro sempre livre para o Chapeu aparecer.
+   ========================================================================= */
+
+/* ---------- Tokens ---------- */
+:root {
+  --gold:        #d9b25a;
+  --gold-soft:   #f2dcae;
+  --gold-deep:   #a8843a;
+  --ink:         #0b0805;
+  --panel:       rgba(18, 13, 8, .82);
+  --panel-2:     rgba(10, 7, 4, .74);
+  --line:        rgba(217, 178, 90, .38);
+
+  /* Cores da casa vencedora (trocadas via [data-house] no <body>) */
+  --house-1: #d9b25a;
+  --house-2: #a8843a;
+  --house-glow: rgba(217, 178, 90, .45);
+
+  --fade: 620ms;
+  --fade-video: 200ms;
+  --ease: cubic-bezier(.22, .61, .36, 1);
+
+  --font-display: "Cinzel Decorative", "Cinzel", Georgia, serif;
+  --font-title:   "Cinzel", Georgia, serif;
+  --font-body:    "EB Garamond", "Palatino Linotype", Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+/* O cenario em video (.stage-bg) e criado pelo useCenario e fica no <body>,
+   como IRMAO do #root. Estas duas camadas garantem que ele sempre pinte
+   atras da interface. */
+#root { position: relative; z-index: 1; }
+
+body {
+  background: #07060a;
+  color: var(--gold-soft);
+  font-family: var(--font-body);
+  font-size: 18px;
+  line-height: 1.55;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+
+  /* Interface de quiosque: nada de selecionar texto, arrastar ou ver o cursor
+     de texto piscando ao clicar nos títulos e perguntas. */
+  cursor: default;
+  caret-color: transparent;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* some com o rastro azul da seleção, caso algo escape */
+::selection { background: transparent; }
+
+/* o campo de nome é a única exceção: precisa digitar e ver o cursor */
+input {
+  cursor: text;
+  caret-color: var(--gold);
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+}
+input::selection { background: rgba(217, 178, 90, .3); }
+
+/* imagens e vídeos não podem ser arrastados para fora */
+img, video, svg { -webkit-user-drag: none; user-select: none; }
+
+body.locked { cursor: progress; }
+
+/* =========================================================================
+   CENARIO EM VIDEO
+   ========================================================================= */
+.stage-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: #07060a;
+  pointer-events: none;
+}
+
+.bg-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+
+  /* contain = mostra o video INTEIRO, sem cortar nada.
+     Se a proporcao do video nao bater com a da janela, sobram faixas pretas.
+     (era "cover", que preenchia a tela inteira ampliando e cortando as bordas
+     - e dai vinha a sensacao de zoom) */
+  object-fit: contain;
+}
+
+/* o video de fala entra por cima do estatico, que segue rodando embaixo:
+   crossfade rapido, sem piscar preto entre um e outro */
+.bg-video--talk {
+  opacity: 0;
+  transition: opacity var(--fade-video) ease-in-out;
+  will-change: opacity;
+}
+.bg-video--talk.on { opacity: 1; }
+
+/* escurece topo e base para o texto ficar legivel sobre o video */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, .74) 0%, rgba(0, 0, 0, .12) 26%,
+                    rgba(0, 0, 0, .12) 52%, rgba(0, 0, 0, .82) 100%),
+    radial-gradient(ellipse at center, transparent 42%, rgba(0, 0, 0, .55) 100%);
+}
+
+/* =========================================================================
+   TELAS (fade in / fade out)
+   ========================================================================= */
+#app {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: opacity var(--fade) var(--ease),
+              transform var(--fade) var(--ease),
+              visibility 0s linear var(--fade);
+}
+.screen.is-active {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+
+/* Grade de 3 faixas: topo / centro livre / base */
+.stage {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: clamp(14px, 2.6vh, 30px) clamp(16px, 4vw, 54px)
+           clamp(16px, 3vh, 34px);
+  text-align: center;
+}
+.stage-top,
+.stage-bottom { display: grid; gap: 10px; justify-items: center; align-content: start; }
+.stage-bottom { align-content: end; }
+.stage-middle { min-height: 0; } /* fica vazio de proposito: e onde o Chapeu aparece */
+
+/* =========================================================================
+   PAINEIS DE PERGAMINHO ESCURO
+   ========================================================================= */
+.panel {
+  position: relative;
+  width: min(880px, 94vw);
+  padding: clamp(14px, 2.2vh, 22px) clamp(20px, 3vw, 38px);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, .6),
+    inset 0 0 40px rgba(217, 178, 90, .07);
+  animation: panelIn .5s var(--ease) both;
+}
+/* cantos dourados */
+.panel::before,
+.panel::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--gold);
+  opacity: .7;
+}
+.panel::before { top: 5px; left: 5px; border-right: 0; border-bottom: 0; }
+.panel::after { bottom: 5px; right: 5px; border-left: 0; border-top: 0; }
+
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.panel--start { width: min(760px, 94vw); }
+.panel--suspense { width: min(680px, 94vw); }
+
+/* =========================================================================
+   TIPOGRAFIA
+   ========================================================================= */
+.eyebrow {
+  font-family: var(--font-title);
+  letter-spacing: .32em;
+  text-transform: uppercase;
+  font-size: clamp(.58rem, 1.1vw, .72rem);
+  color: var(--gold-deep);
+  margin: 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .9);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 5.2vw, 3.4rem);
+  line-height: 1.02;
+  margin: 0;
+  color: var(--gold-soft);
+  text-shadow: 0 0 30px rgba(217, 178, 90, .4), 0 4px 12px rgba(0, 0, 0, .95);
+}
+.title span { color: var(--gold); }
+
+.lead {
+  max-width: 52ch;
+  margin: 0 auto 14px;
+  font-style: italic;
+  font-size: clamp(.95rem, 1.6vw, 1.05rem);
+  color: #d8c49a;
+}
+
+/* =========================================================================
+   TELA INICIAL
+   ========================================================================= */
+.start-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 16px;
+}
+
+.name-field { display: grid; gap: 5px; justify-items: center; min-width: 240px; }
+.name-field span {
+  font-family: var(--font-title);
+  font-size: .66rem;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--gold-deep);
+}
+.name-field em { text-transform: none; letter-spacing: .04em; opacity: .75; }
+.name-field input {
+  width: 100%;
+  padding: 10px 14px;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: var(--gold-soft);
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  outline: none;
+  transition: border-color .25s, box-shadow .25s, background .25s;
+}
+.name-field input::placeholder { color: rgba(242, 220, 174, .3); }
+.name-field input:focus {
+  border-color: var(--gold);
+  background: rgba(255, 255, 255, .08);
+  box-shadow: 0 0 0 3px rgba(217, 178, 90, .14);
+}
+
+/* =========================================================================
+   BOTOES
+   ========================================================================= */
+.btn {
+  position: relative;
+  font-family: var(--font-title);
+  font-size: clamp(.8rem, 1.3vw, .95rem);
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--gold-soft);
+  padding: 12px 30px;
+  border: 1px solid var(--gold-deep);
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(217, 178, 90, .2), rgba(217, 178, 90, .05));
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform .25s var(--ease), box-shadow .3s, border-color .3s, color .3s;
+}
+.btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 236, 190, .32) 50%, transparent 65%);
+  transform: translateX(-120%);
+  transition: transform .7s var(--ease);
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+  color: #fff5dd;
+  box-shadow: 0 0 24px rgba(217, 178, 90, .3), inset 0 0 18px rgba(217, 178, 90, .12);
+}
+.btn:hover:not(:disabled)::after { transform: translateX(120%); }
+.btn:active:not(:disabled) { transform: translateY(0) scale(.985); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+
+.btn-primary { padding: 13px 36px; }
+.btn-ghost {
+  padding: 6px 16px;
+  font-size: .68rem;
+  letter-spacing: .18em;
+  opacity: .75;
+  background: rgba(10, 7, 4, .6);
+}
+.btn-ghost:hover { opacity: 1; }
+
+/* =========================================================================
+   CABECALHO DA PERGUNTA
+   ========================================================================= */
+.q-header { display: grid; gap: 7px; justify-items: center; }
+.q-counter {
+  font-family: var(--font-title);
+  letter-spacing: .28em;
+  text-transform: uppercase;
+  font-size: clamp(.58rem, 1.1vw, .7rem);
+  color: var(--gold-deep);
+  margin: 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .9);
+}
+.runes { display: flex; gap: 10px; }
+.runes i {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--gold-deep);
+  transform: rotate(45deg);
+  transition: background .4s, box-shadow .4s, transform .4s;
+}
+.runes i.done { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
+.runes i.current {
+  background: var(--gold-soft);
+  box-shadow: 0 0 14px var(--gold-soft);
+  transform: rotate(45deg) scale(1.35);
+}
+
+.q-text {
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: clamp(1.05rem, 2.2vw, 1.5rem);
+  line-height: 1.3;
+  margin: 0;
+  color: var(--gold-soft);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, .95);
+}
+
+/* =========================================================================
+   ALTERNATIVAS  (2 x 2 na base da tela)
+   ========================================================================= */
+.options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: min(1020px, 96vw);
+  animation: optionsIn .5s .08s var(--ease) both;
+}
+@keyframes optionsIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: clamp(.88rem, 1.35vw, 1rem);
+  line-height: 1.35;
+  color: var(--gold-soft);
+  padding: 11px 16px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(18, 13, 8, .84), rgba(10, 7, 4, .76));
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .5);
+  cursor: pointer;
+  transition: transform .2s var(--ease), box-shadow .25s, background .25s,
+              border-color .25s, opacity .35s;
+}
+.option .letter {
+  flex: 0 0 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: .9rem;
+  color: #1a1206;
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold-deep));
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(217, 178, 90, .3);
+  transition: transform .25s var(--ease);
+}
+.option .txt { flex: 1; }
+
+.option:hover:not(:disabled) {
+  transform: translateY(-3px);
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgba(38, 27, 12, .9), rgba(20, 14, 7, .84));
+  box-shadow: 0 14px 32px rgba(0, 0, 0, .6), 0 0 22px rgba(217, 178, 90, .2);
+}
+.option:hover:not(:disabled) .letter { transform: scale(1.1) rotate(-6deg); }
+.option:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.option:disabled { cursor: not-allowed; }
+
+/* estado apos o clique */
+.option.faded { opacity: .28; }
+.option.chosen {
+  opacity: 1;
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgba(58, 42, 16, .92), rgba(30, 21, 8, .86));
+  box-shadow: 0 0 0 1px var(--gold), 0 0 30px rgba(217, 178, 90, .35);
+  animation: chosenPulse .7s var(--ease);
+}
+@keyframes chosenPulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+/* =========================================================================
+   INDICADOR "O CHAPEU ESTA FALANDO"
+   (altura fixa: reserva espaco e nao empurra as alternativas)
+   ========================================================================= */
+.listening {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 38px;
+  opacity: 0;
+  transition: opacity .35s;
+}
+.listening.on { opacity: 1; }
+.listening-text {
+  font-family: var(--font-title);
+  font-size: .68rem;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--gold-deep);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .9);
+}
+.wave { display: inline-flex; align-items: flex-end; gap: 3px; height: 18px; }
+.wave i { width: 3px; background: var(--gold); border-radius: 2px; animation: wave 1s ease-in-out infinite; }
+.wave i:nth-child(1) { height: 7px;  animation-delay: 0s; }
+.wave i:nth-child(2) { height: 14px; animation-delay: .12s; }
+.wave i:nth-child(3) { height: 18px; animation-delay: .24s; }
+.wave i:nth-child(4) { height: 12px; animation-delay: .36s; }
+.wave i:nth-child(5) { height: 8px;  animation-delay: .48s; }
+@keyframes wave { 0%, 100% { transform: scaleY(.4); } 50% { transform: scaleY(1); } }
+
+/* =========================================================================
+   SUSPENSE
+   ========================================================================= */
+.suspense-text {
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 3.2vw, 2rem);
+  color: var(--gold-soft);
+  margin: 0 0 4px;
+  text-shadow: 0 0 24px rgba(217, 178, 90, .32), 0 2px 12px rgba(0, 0, 0, .9);
+}
+.suspense-sub { color: #b9a377; font-style: italic; margin: 0; font-size: .95rem; }
+.dots i { font-style: normal; animation: blink 1.4s infinite; }
+.dots i:nth-child(2) { animation-delay: .2s; }
+.dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 60%, 100% { opacity: 0; } 30% { opacity: 1; } }
+
+/* =========================================================================
+   RESULTADO
+   ========================================================================= */
+.result-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(60% 55% at 50% 45%, var(--house-glow), transparent 70%),
+    rgba(4, 3, 6, .8);
+  animation: scrimIn .9s var(--ease) both;
+  pointer-events: none;
+}
+@keyframes scrimIn { from { opacity: 0; } to { opacity: 1; } }
+
+.stage--result { grid-template-rows: 1fr; place-items: center; }
+
+.result-box {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  max-height: 100%;
+}
+
+.result-pre {
+  font-family: var(--font-title);
+  letter-spacing: .28em;
+  text-transform: uppercase;
+  font-size: clamp(.6rem, 1.2vw, .74rem);
+  color: var(--gold-deep);
+  margin: 0;
+}
+
+.crest {
+  width: clamp(140px, 22vh, 230px);
+  margin: 2px 0;
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .7));
+  animation: crestIn .9s var(--ease) both;
+}
+.crest svg, .crest img { width: 100%; height: auto; display: block; }
+@keyframes crestIn {
+  0%   { opacity: 0; transform: scale(.6) rotate(-8deg); filter: blur(10px); }
+  60%  { opacity: 1; transform: scale(1.06) rotate(2deg); filter: blur(0); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+.house-name {
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 6.5vw, 3.6rem);
+  line-height: 1;
+  margin: 2px 0;
+  color: var(--house-1);
+  letter-spacing: .04em;
+  text-shadow: 0 0 36px var(--house-glow), 0 3px 10px rgba(0, 0, 0, .8);
+  animation: nameIn .8s .25s var(--ease) both;
+}
+@keyframes nameIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.house-motto {
+  max-width: 42ch;
+  font-style: italic;
+  font-size: clamp(.9rem, 1.5vw, 1rem);
+  color: #d0bb90;
+  margin: 0;
+  animation: nameIn .8s .45s var(--ease) both;
+}
+
+/* aviso que so aparece quando o desempate aleatorio precisou entrar em acao */
+.tiebreak-note {
+  max-width: 46ch;
+  margin: 8px 0 12px;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: .8rem;
+  color: #9a8760;
+  animation: nameIn .8s .68s var(--ease) both;
+}
+
+.result-actions { animation: nameIn .8s .75s var(--ease) both; }
+
+/* Paletas por casa */
+body[data-house="grifinoria"] { --house-1: #e8bd3a; --house-2: #7f0909; --house-glow: rgba(160, 30, 20, .45); }
+body[data-house="sonserina"]  { --house-1: #3fc178; --house-2: #1a472a; --house-glow: rgba(26, 90, 55, .45); }
+body[data-house="corvinal"]   { --house-1: #8fb8ea; --house-2: #0e1a40; --house-glow: rgba(30, 55, 120, .45); }
+body[data-house="lufalufa"]   { --house-1: #f5cf6d; --house-2: #726255; --house-glow: rgba(150, 115, 30, .45); }
+
+/* =========================================================================
+   RESPONSIVO
+   ========================================================================= */
+/* telas baixas (projetor 16:9 pequeno): tudo mais compacto */
+@media (max-height: 720px) {
+  .stage { gap: 6px; padding-top: 10px; padding-bottom: 12px; }
+  .panel { padding: 10px 20px; }
+  .lead { margin-bottom: 10px; }
+  .option { padding: 9px 13px; }
+  .listening { min-height: 30px; }
+}
+
+/* celular / tela estreita: alternativas em coluna unica */
+@media (max-width: 760px) {
+  body { font-size: 16px; }
+  .options { grid-template-columns: 1fr; gap: 8px; width: 96vw; }
+  .option { padding: 10px 13px; }
+  .start-row { flex-direction: column; align-items: stretch; }
+  .btn-primary { width: 100%; }
+  .stage { padding-left: 14px; padding-right: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  /* o crossfade dos videos continua, so que instantaneo */
+  .bg-video--talk { transition-duration: .01ms !important; }
+}
