@@ -1,196 +1,233 @@
-# 🎩 O Chapéu Seletor — React + Vite + TypeScript
+# O Chapéu Seletor
 
-Sistema interativo de seleção de casas de Hogwarts.
-**5 perguntas**, reação falada do Chapéu a cada resposta e veredito final com
-áudio próprio de cada casa.
+Um teste de casas de Hogwarts no navegador, com o Chapéu Seletor em 3D. A pessoa
+responde 5 perguntas, o Chapéu comenta cada resposta com a própria voz e, no fim,
+anuncia a casa.
 
-**Sem Tailwind.** Só CSS nativo, num único `src/styles.css`.
+![Tela inicial, com o Chapéu no Salão Principal](docs/screenshots/inicio.webp)
 
----
+## O que é e por que existe
 
-## ▶️ Como rodar
+Foi feito para uma festa de aniversário com tema de Harry Potter. A ideia era que
+os convidados pudessem descobrir com facilidade a qual casa pertencem: um teste
+rápido, interativo e divertido, que roda num computador ou numa TV, sem cadastro e
+sem internet além das fontes.
 
-```powershell
-cd "c:\Users\pedri\OneDrive\Área de Trabalho\Web Development\chapeu-seletor-react"
-npm install     # só na primeira vez (já foi feito)
+## Como funciona
+
+1. **Início.** A pessoa digita o nome (opcional) e clica em "Colocar o Chapéu".
+2. **5 perguntas**, cada uma com 4 alternativas. Cada alternativa pertence a uma
+   casa e vale 1 ponto para ela. A ordem das alternativas é embaralhada a cada
+   partida, para que a mesma letra não leve sempre à mesma casa.
+3. **Reação do Chapéu.** Depois de cada resposta, toca a fala do Chapéu para aquela
+   alternativa (são 20 falas, uma por alternativa). A tela fica travada enquanto ele
+   fala e só passa para a próxima pergunta quando o áudio termina. Depois de 1,6 s
+   aparece o botão "Avançar" para pular a fala.
+4. **Apuração**, em `apurar()` no `src/data/houses.ts`: acha a maior pontuação
+   entre as 4 casas e junta todas as que chegaram a ela.
+
+   Com 5 perguntas o empate no topo é raro, mas acontece (2-2-1-0, por exemplo).
+   No empate o Chapéu não sorteia: como nos livros, ele leva em conta a escolha da
+   pessoa. Uma tela pergunta qual das casas empatadas ela prefere, e a escolhida
+   segue para o veredito. A tela de resultado lembra entre quais casas ela estava.
+5. **Suspense.** O Chapéu "pensa" na tela de suspense enquanto toca a fala do
+   veredito da casa escolhida. A revelação espera o fim dessa fala e dura no mínimo
+   2,8 s. O botão "Revelar agora" aparece depois de 1,6 s.
+6. **Veredito.** O cenário escurece e aparecem o brasão, o nome e o lema da casa.
+   "Próximo Aluno" volta ao início para o próximo convidado.
+
+Se um MP3 faltar ou o navegador bloquear o som, o fluxo não trava: depois de um
+erro ele espera um tempo fixo e segue, e um áudio parado sem nenhum evento é
+destravado em 15 s.
+
+![Pergunta, com o Chapéu falando](docs/screenshots/pergunta-e-fala.webp)
+
+## O Chapéu em 3D e as expressões
+
+- **Modelo.** A malha do Chapéu foi gerada com o [Meshy](https://www.meshy.ai/) e
+  depois preparada para a web (limpeza, normais suaves, compressão meshopt e um
+  atributo de superfície assado). Fica em `public/models/chapeu.glb`.
+- **Material.** O modelo não tem textura. O couro é procedural, calculado no shader
+  a partir da geometria (vincos escuros, cristas mais claras, grão e arranhões em
+  ruído 3D).
+- **Rosto no vertex shader.** A malha é uma só e parada. Lábios, cantos da boca,
+  sobrancelhas, olhos, nariz e ponta são regiões suaves no espaço do modelo, e o
+  shader deforma cada uma por uniforms. A normal é recalculada por diferença
+  finita, então a luz acompanha a careta.
+- **Expressões por momento.** Cada expressão é um conjunto de valores para essas
+  regiões, e cada valor chega ao alvo por uma mola amortecida, sem saltos:
+  - início e perguntas: neutro, com piscadas e a ponta balançando devagar;
+  - reação a uma resposta: a expressão muda conforme a casa da alternativa
+    (satisfeito para Grifinória e Lufa-Lufa, surpreso para Corvinal, desconfiado
+    para Sonserina);
+  - suspense: pensativo, com a ponta enrolando para os lados; no fim da fala do
+    veredito ele passa a triunfante;
+  - resultado: triunfante.
+- **Boca sincronizada com a voz.** O áudio da fala passa por um `AnalyserNode` da
+  Web Audio API, com filtro na faixa da voz. O volume de cada quadro abre e fecha a
+  boca, e o começo de cada sílaba dá um pequeno tranco nas sobrancelhas e na ponta.
+  Sem análise de áudio disponível, a boca segue um ritmo de sílabas gerado no
+  código.
+- **Salão Principal.** A cena é montada em código com three.js: paredes, vitral,
+  banco, velas flutuantes e tochas. As chamas são desenhadas num único shader
+  instanciado, e as texturas são geradas no carregamento.
+- **Desempenho e alternativas.** O pedaço 3D é carregado depois da interface. Se a
+  máquina ficar abaixo de cerca de 40 fps, a resolução do canvas baixa. Sem WebGL 2,
+  com "reduzir movimento" ligado no sistema ou se o modelo falhar, aparece uma
+  imagem parada da própria cena (`public/cena/`).
+
+![Suspense antes do veredito](docs/screenshots/suspense.webp)
+
+## Controles
+
+| Controle | O que faz |
+|---|---|
+| Botão de alto-falante (canto superior direito) | Silencia as falas. O fluxo e a boca continuam iguais, só sem som. A escolha fica salva no navegador. |
+| Botão de tela cheia, ou tecla **F** | Entra e sai da tela cheia. O botão não aparece onde o navegador não permite (no iPhone, por exemplo). |
+| Teclas **1** a **4** ou **A** a **D** | Respondem a pergunta pelo teclado. |
+| "Avançar" e "Revelar agora" | Pulam a fala em curso. |
+| "Próximo Aluno" | Zera tudo e volta ao início. |
+
+## Stack
+
+- TypeScript e React 18
+- three.js e React Three Fiber
+- GLSL (deformação do rosto, couro e chamas)
+- Web Audio API (análise do volume da fala)
+- Vite
+- CSS próprio, num único `src/styles.css`, sem framework de estilo
+
+## Como rodar
+
+Requer Node.js e npm.
+
+```bash
+npm install
 npm run dev
 ```
 
+O Vite abre o navegador e mostra no terminal o endereço local e o da rede, para
+abrir também pelo celular no mesmo Wi-Fi.
+
 | Script | O que faz |
 |---|---|
-| `npm run dev` | Servidor de desenvolvimento (abre sozinho, e também expõe o IP da rede). |
+| `npm run dev` | Servidor de desenvolvimento. |
 | `npm run typecheck` | Só a checagem de tipos (`tsc --noEmit`). |
-| `npm run build` | **Typecheck + build.** Falha se houver erro de tipo. |
-| `npm run preview` | Serve a pasta `dist/` pra conferir o build. |
+| `npm run build` | Checagem de tipos e build em `dist/`. Falha se houver erro de tipo. |
+| `npm run preview` | Serve a pasta `dist/` para usar ou conferir o build. |
 
-### Versão final pra festa
+### Build para usar na festa
 
-```powershell
+```bash
 npm run build
+npm run preview
 ```
 
-Como o `base` é `"./"`, dá pra **abrir o `dist/index.html` com dois cliques** —
-sem terminal, sem servidor. É o modo mais seguro pro dia do evento.
+O `dist/` precisa ser servido por HTTP. Abrir o `dist/index.html` com dois cliques
+não funciona no Chrome e nos navegadores baseados nele: os scripts do build são
+bloqueados em `file://` e a página fica em branco. Além do `npm run preview`,
+qualquer servidor estático serve, por exemplo:
 
----
+```bash
+python3 -m http.server 8080 -d dist
+```
 
-## 📁 Estrutura
+As fontes vêm do Google Fonts. Sem internet, a interface usa as fontes serifadas do
+sistema.
+
+## Estrutura
 
 ```
-chapeu-seletor-react/
-├─ index.html                  ← shell do Vite
-├─ tsconfig.json               ← strict + noUnusedLocals + exactOptionalPropertyTypes
+chapeu-seletor/
+├─ index.html
 ├─ vite.config.ts
+├─ tsconfig.json
+├─ LICENSE
+├─ docs/screenshots/           capturas usadas neste README
 ├─ public/
-│  ├─ audio/                   ← 24 MP3 (20 reações + 4 vereditos)
-│  ├─ video/                   ← static-video.mp4 e talk-video.mp4
-│  └─ brasoes/                 ← (opcional) brasao_grifinoria.png etc.
+│  ├─ audio/                   24 MP3: 20 reações e 4 vereditos
+│  ├─ models/chapeu.glb        o Chapéu em 3D
+│  ├─ cena/                    imagens paradas da cena, para quando o 3D não roda
+│  ├─ brasoes/                 PNG dos brasões das casas
+│  └─ video/                   vídeos da versão anterior, fora de uso
 └─ src/
-   ├─ main.tsx                 ← ponto de entrada
-   ├─ App.tsx                  ← orquestra o fluxo e todo o estado
-   ├─ types.ts                 ← HouseKey, Question, Placar, Veredito…
-   ├─ config.ts                ← tempos e caminhos
-   ├─ styles.css               ← CSS nativo, tema inteiro
+   ├─ main.tsx                 ponto de entrada
+   ├─ App.tsx                  fluxo das telas e estado
+   ├─ types.ts                 HouseKey, Question, Placar, Veredito
+   ├─ config.ts                tempos e caminhos
+   ├─ styles.css
    ├─ data/
-   │  ├─ questions.ts          ← as 5 perguntas
-   │  └─ houses.ts             ← casas + apuração e desempate
+   │  ├─ questions.ts          as 5 perguntas, com casa e áudio de cada alternativa
+   │  └─ houses.ts             as casas, a apuração e o desempate
    ├─ hooks/
-   │  └─ useHatAudio.ts        ← motor de áudio (a Promise que segura o fluxo)
+   │  ├─ useHatAudio.ts        toca as falas, analisa o volume e controla o som
+   │  └─ useTelaCheia.ts       tela cheia, inclusive no Safari
+   ├─ cena/
+   │  ├─ Cenario.tsx           fundo: imagem parada e cena 3D carregada sob demanda
+   │  ├─ CenaChapeu.tsx        canvas, câmera, luzes e névoa
+   │  ├─ Salao.tsx             o Salão Principal
+   │  ├─ Chamas.tsx            velas e tochas num shader instanciado
+   │  ├─ texturas.ts           texturas procedurais
+   │  └─ chapeu/
+   │     ├─ Chapeu.tsx         o Chapéu na cena
+   │     ├─ modelo.ts          carrega o glb
+   │     ├─ couro.ts           material de couro
+   │     ├─ deformacao.ts      deformação do rosto no vertex shader
+   │     └─ expressoes.ts      expressões, molas e boca
    └─ components/
-      ├─ Background.tsx        ← os dois vídeos + crossfade
-      ├─ HouseCrest.tsx        ← brasão (PNG se existir, senão SVG)
       ├─ StartScreen.tsx
       ├─ QuestionScreen.tsx
       ├─ SuspenseScreen.tsx
-      └─ ResultScreen.tsx
+      ├─ ResultScreen.tsx
+      ├─ HouseCrest.tsx        brasão: o PNG, ou um escudo desenhado em SVG
+      └─ ControlesTela.tsx     botões de som e tela cheia
 ```
 
----
+Para acrescentar uma pergunta, basta incluir um objeto em `QUESTIONS`, com as 4
+alternativas, a casa e o áudio de cada uma. O contador e a apuração se ajustam
+sozinhos.
 
-## 🔠 Tipagem
+![Veredito](docs/screenshots/veredito.webp)
 
-O tipo que amarra o projeto é o `HouseKey`:
+## Créditos e aviso legal
 
-```ts
-export type HouseKey = "grifinoria" | "sonserina" | "corvinal" | "lufalufa";
-```
+### Créditos
 
-Ele aparece em `Record<HouseKey, House>`, em `Placar = Record<HouseKey, number>`
-e no campo `casa` de cada alternativa. Consequência prática: se você digitar
-`casa: "grifinoira"` em `questions.ts`, o `tsc` acusa na hora — em vez de a
-alternativa simplesmente não pontuar no meio da festa.
+- **Modelo 3D do Chapéu:** Modelo 3D gerado com Meshy AI ([meshy.ai](https://www.meshy.ai/)).
+  As gerações do plano gratuito do Meshy são distribuídas sob a licença
+  [Creative Commons Atribuição 4.0 (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/deed.pt-br),
+  e o modelo segue esses termos. O arquivo deste repositório é uma versão
+  modificada da geração original: malha limpa, normais suavizadas, compressão
+  meshopt e um atributo de superfície acrescentado para o shader.
+- **Cena 3D, animação, expressões e código:** desenvolvidos por Pedro Toni com o
+  Claude (Anthropic).
+- **Vozes do Chapéu:** geradas com o [fish.audio](https://fish.audio/), sujeitas aos
+  termos de uso do serviço.
 
-Outras decisões de tipo que valem nota:
+### Aviso legal
 
-- **`Question.opcoes` é uma tupla de 4**, não `Opcao[]`. Como as letras A–D e a
-  grade 2×2 dependem disso, o tipo impede acrescentar uma 5ª alternativa sem
-  querer.
-- **`OpcaoIndex = 0 | 1 | 2 | 3`** em vez de `number`, então não dá pra chamar
-  `responder(7)`.
-- **`Placar` é `Record<HouseKey, number>`**, não `Partial`. As 4 casas sempre
-  existem, o que elimina `|| 0` espalhado pelo código.
-- O único `as` do projeto está em `HOUSE_KEYS`, porque `Object.keys()` devolve
-  `string[]`. É seguro: `HOUSES` já é `Record<HouseKey, House>`.
-- `tsconfig` em `strict` com `noUnusedLocals`, `noUnusedParameters` e
-  `exactOptionalPropertyTypes`.
+Este é um projeto de fã, não oficial e sem fins comerciais, feito para uma festa de
+aniversário particular e para estudo. Não tem vínculo com a Warner Bros.
+Entertainment, a Wizarding World Digital ou J.K. Rowling, e não é endossado nem
+patrocinado por elas.
 
----
+Harry Potter, o Chapéu Seletor, Hogwarts, os nomes das casas (Grifinória, Sonserina,
+Corvinal e Lufa-Lufa) e os seus brasões são marcas e obras protegidas dos seus
+respectivos titulares. Aparecem aqui sem fins comerciais, e nenhum direito sobre
+eles é reivindicado.
 
-## 🧮 A matemática do final
+As imagens em `public/brasoes/` são ilustrações dos brasões das quatro casas. O
+repositório não registra quem as criou nem de onde vieram: elas entraram no
+primeiro commit sem indicação de fonte. Por retratarem os brasões das casas, valem
+para elas as mesmas ressalvas acima, e elas não são cobertas pela licença deste
+repositório.
 
-Depois da 5ª pergunta, `definirCasa()` em `src/data/houses.ts`:
+Se algum titular de direitos pedir, o material será removido.
 
-1. acha a **maior pontuação** entre as 4 casas;
-2. junta **todas** as casas que alcançaram esse número;
-3. se for mais de uma, **sorteia com `Math.random()`** entre as empatadas —
-   antes de tocar o áudio do veredito.
+### Licença
 
-5 perguntas reduzem muito o empate, mas não eliminam: **2-2-1-0** continua
-possível. Por isso o sorteio fica.
-
-O `Veredito` devolve `{ casa, empate, empatadas, maiorPontuacao }`. Quando
-`empate` é `true`, a tela de resultado mostra uma linha discreta contando entre
-quais casas o Chapéu hesitou.
-
-Distribuição verificada em 40.000 sorteios de um placar 2-2-1-0: ~50/50 entre as
-duas empatadas, e nenhuma casa fora do empate jamais vence.
-
----
-
-## 🔊 Os 24 áudios
-
-Todos em `public/audio/`. Padrão: `audio_q<pergunta>_<letra>.mp3`.
-
-### Pergunta 5 — A Poção Misteriosa *(nova)*
-
-| Arquivo | Casa | Trecho da fala |
-|---|---|---|
-| `audio_q5_a.mp3` | Grifinória | *"O elixir da bravura!"* |
-| `audio_q5_b.mp3` | Corvinal | *"A expansão da mente… a sede de…"* |
-| `audio_q5_c.mp3` | Sonserina | *"Controle e segredos…"* |
-| `audio_q5_d.mp3` | Lufa-Lufa | *"Conforto e amor…"* |
-
-As perguntas 1 a 4 e os 4 vereditos estão mapeados no `LEIA-ME.md` da versão
-anterior (`../chapeu-seletor/`). Os comentários acima de cada pergunta em
-`src/data/questions.ts` também mostram a fala de cada áudio.
-
-> Para adicionar uma **6ª pergunta**: é só acrescentar um objeto no array
-> `QUESTIONS`. Contador, runas e apuração se ajustam sozinhos.
-
----
-
-## 🎬 Os vídeos de fundo
-
-| Arquivo | Comportamento |
-|---|---|
-| `static-video.mp4` | Loop infinito, nunca para. Fundo padrão. |
-| `talk-video.mp4` | Só enquanto o Chapéu fala. Também em loop, então acompanha exatamente a duração do MP3. |
-
-**Os dois são mudos.** Além do `muted` no JSX, o `Background.tsx` força `muted`,
-`defaultMuted` e `volume = 0` via ref no primeiro render — o React às vezes
-perde o atributo `muted` na montagem inicial.
-
-Crossfade de **200 ms**: o vídeo de fala faz fade por cima do estático, que
-continua rodando embaixo, então nunca aparece flash preto. Pra ajustar, mude
-`FADE_VIDEO_MS` no `config.ts` **e** `--fade-video` no `styles.css`.
-
----
-
-## 🔒 Bloqueio de tela durante o áudio
-
-No `App.tsx`, `responder()`:
-
-1. trava via **`travadaRef`** (um `useRef`, não só o state — state é assíncrono
-   e dois cliques muito rápidos passariam antes do re-render);
-2. pontua a casa da alternativa;
-3. **aguarda** `await play(opcao.audio, FALLBACK_MS)` — a Promise só resolve no
-   evento `ended` do áudio;
-4. avança, ou chama `finalizar()` na última pergunta.
-
-### Rede de segurança
-
-Se um MP3 sumir ou o navegador travar o som, o `useHatAudio` destrava sozinho:
-evento `error` → espera `FALLBACK_MS`; áudio congelado sem evento → guarda de
-15 s. E um botão **"Avançar ▸▸"** aparece depois de ~1,6 s em qualquer áudio.
-
----
-
-## 🖼️ Layout sobre o vídeo
-
-A tela é uma grade de três faixas (`.stage`): **topo**, **centro livre** e
-**base**. O centro fica vazio de propósito — é onde o Chapéu aparece no vídeo.
-Pergunta no topo, alternativas em 2×2 na base (coluna única abaixo de 760 px).
-Painéis usam fundo escuro translúcido com `backdrop-filter: blur()`.
-
-A única tela que cobre o cenário é a de resultado, de propósito.
-
----
-
-## 💡 Na hora da festa
-
-- **`F11`** pra tela cheia.
-- Botão **"Próximo Aluno"** reseta tudo entre uma criança e outra.
-- Atalhos **`1` `2` `3` `4`** (ou `A` `B` `C` `D`) respondem pelo teclado.
-- Brasões oficiais: crie `public/brasoes/` e solte `brasao_grifinoria.png`,
-  `brasao_sonserina.png`, `brasao_corvinal.png` e `brasao_lufalufa.png` — o app
-  detecta e troca sozinho.
+O código-fonte escrito para este projeto está sob a licença MIT (ver
+[`LICENSE`](LICENSE)). A licença cobre só esse código. Ficam de fora as marcas,
+personagens, nomes e brasões de terceiros, o modelo 3D gerado com o Meshy (que
+segue a CC BY 4.0) e as vozes geradas com o fish.audio (sujeitas aos termos do
+serviço).

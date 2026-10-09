@@ -16,8 +16,8 @@ export interface House {
   /** Nome em caixa alta, usado no brasao e na revelacao. */
   display: string;
   lema: string;
-  /** Emoji do animal, desenhado dentro do escudo em SVG. */
-  animal: string;
+  /** Inicial desenhada dentro do escudo em SVG quando falta o brasao em PNG. */
+  inicial: string;
   /** Cor principal (metal/destaque). */
   cor1: string;
   /** Cor secundaria (fundo do escudo). */
@@ -55,13 +55,21 @@ export interface Question {
 export type OpcaoIndex = 0 | 1 | 2 | 3;
 
 /** Telas do fluxo. */
-export type Tela = "start" | "question" | "suspense" | "result";
+export type Tela = "start" | "question" | "escolha" | "suspense" | "result";
 
-/** Resultado da apuracao. */
+/** Contagem final, antes de saber se a pessoa precisa escolher. */
+export interface Apuracao {
+  /** Todas as casas que empataram na primeira posicao (uma so quando nao ha empate). */
+  empatadas: readonly HouseKey[];
+  /** Pontuacao da(s) casa(s) no topo. */
+  maiorPontuacao: number;
+}
+
+/** Resultado final. */
 export interface Veredito {
-  /** Casa vencedora (ja com o desempate resolvido). */
+  /** Casa escolhida pelo Chapeu (no empate, a que a pessoa preferiu). */
   casa: HouseKey;
-  /** true se houve empate e foi preciso sortear. */
+  /** true se houve empate e a pessoa escolheu entre as casas do topo. */
   empate: boolean;
   /** Todas as casas que empataram na primeira posicao. */
   empatadas: readonly HouseKey[];

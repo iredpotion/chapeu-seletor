@@ -70,8 +70,10 @@ function CrestSVG({ casa }: CrestProps) {
         textAnchor="middle"
         dominantBaseline="middle"
         fontSize="74"
+        fontWeight="700"
+        fill="#14100a"
       >
-        {h.animal}
+        {h.inicial}
       </text>
     </svg>
   );

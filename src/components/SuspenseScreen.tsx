@@ -11,7 +11,7 @@ export default function SuspenseScreen({
     <div className="stage">
       <div className="stage-top" />
 
-      {/* centro livre: o Chapéu do vídeo é quem está "pensando" */}
+      {/* centro livre: o Chapéu em 3D é quem está "pensando" */}
       <div className="stage-middle" />
 
       <div className="stage-bottom">

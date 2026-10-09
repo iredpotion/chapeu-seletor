@@ -4,7 +4,9 @@ import type { OpcaoIndex } from "../types";
 interface QuestionScreenProps {
   /** Índice da pergunta atual dentro de QUESTIONS. */
   indice: number;
-  /** Alternativa clicada, ou null se ainda não respondeu. */
+  /** Ordem em que as alternativas aparecem: posição na tela -> índice original. */
+  ordem: readonly OpcaoIndex[];
+  /** Posição na tela da alternativa clicada, ou null se ainda não respondeu. */
   escolhida: OpcaoIndex | null;
   /** Tela bloqueada enquanto o áudio toca. */
   travada: boolean;
@@ -16,6 +18,7 @@ interface QuestionScreenProps {
 
 export default function QuestionScreen({
   indice,
+  ordem,
   escolhida,
   travada,
   falando,
@@ -50,7 +53,7 @@ export default function QuestionScreen({
         </div>
       </div>
 
-      {/* ---------- centro livre: o Chapéu do vídeo ---------- */}
+      {/* ---------- centro livre: o Chapéu em 3D ---------- */}
       <div className="stage-middle" />
 
       {/* ---------- base: aviso de fala + as 4 alternativas ---------- */}
@@ -73,7 +76,8 @@ export default function QuestionScreen({
         </div>
 
         <div className="options" role="group" aria-label="Alternativas" key={indice}>
-          {q.opcoes.map((op, i) => {
+          {ordem.map((original, i) => {
+            const op = q.opcoes[original];
             const classes = [
               "option",
               escolhida !== null && escolhida !== i ? "faded" : "",

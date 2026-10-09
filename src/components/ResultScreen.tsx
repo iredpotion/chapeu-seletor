@@ -32,12 +32,11 @@ export default function ResultScreen({
           <h1 className="house-name">{h.display}</h1>
           <p className="house-motto">{h.lema}</p>
 
-          {/* só aparece quando o desempate aleatório precisou entrar em ação */}
+          {/* só aparece quando houve empate e a pessoa escolheu */}
           {empate && (
             <p className="tiebreak-note">
-              Houve empate entre{" "}
-              {empatadas.map((k) => HOUSES[k].nome).join(" e ")} — o Chapéu bateu
-              o martelo.
+              Você tinha lugar em {empatadas.map((k) => HOUSES[k].nome).join(" e ")}, e o
+              Chapéu levou em conta a sua escolha.
             </p>
           )}
 

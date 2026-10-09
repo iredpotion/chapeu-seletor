@@ -4,12 +4,14 @@ import StartScreen from "./components/StartScreen";
 import QuestionScreen from "./components/QuestionScreen";
 import SuspenseScreen from "./components/SuspenseScreen";
 import ResultScreen from "./components/ResultScreen";
+import Cenario from "./cena/Cenario";
+import ControlesTela from "./components/ControlesTela";
+import type { Humor } from "./cena/chapeu/expressoes";
 
 import { useHatAudio } from "./hooks/useHatAudio";
-import { useAmbiente } from "./hooks/useAmbiente";
-import { useCenario } from "./hooks/useCenario";
 import { QUESTIONS } from "./data/questions";
-import { HOUSES, definirCasa, placarVazio } from "./data/houses";
+import { HOUSES, apurar, fecharVeredito, placarVazio } from "./data/houses";
+import EscolhaScreen from "./components/EscolhaScreen";
 import {
   ENTRE_PERGUNTAS_MS,
   FADE_MS,
@@ -18,12 +20,30 @@ import {
   SKIP_AFTER_MS,
   SUSPENSE_MIN_MS,
 } from "./config";
-import type { OpcaoIndex, Placar, Tela, Veredito } from "./types";
+import type { Apuracao, HouseKey, OpcaoIndex, Placar, Tela, Veredito } from "./types";
 
 const wait = (ms: number): Promise<void> =>
   new Promise((r) => setTimeout(r, ms));
 
+/** Tom da reacao do Chapeu a cada casa escolhida, enquanto ele comenta. */
+const VIES_DA_CASA: Readonly<Record<HouseKey, Humor>> = {
+  grifinoria: "satisfeito",
+  corvinal: "surpreso",
+  sonserina: "desconfiado",
+  lufalufa: "satisfeito",
+};
+
 /** Mapa de atalhos de teclado -> índice da alternativa. */
+/** Fisher-Yates: devolve uma copia em ordem aleatoria. */
+function embaralhar<T>(lista: readonly T[]): T[] {
+  const copia = [...lista];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copia[i], copia[j]] = [copia[j] as T, copia[i] as T];
+  }
+  return copia;
+}
+
 const ATALHOS: Readonly<Record<string, OpcaoIndex>> = {
   "1": 0, "2": 1, "3": 2, "4": 3,
   a: 0, b: 1, c: 2, d: 3,
@@ -39,15 +59,12 @@ export default function App() {
   const [travada, setTravada] = useState(false);
   const [nome, setNome] = useState("");
   const [veredito, setVeredito] = useState<Veredito | null>(null);
+  const [apuracao, setApuracao] = useState<Apuracao | null>(null);
+  // ordem das alternativas de cada pergunta, sorteada a cada partida: posicao na tela -> indice original
+  const [ordens, setOrdens] = useState<readonly OpcaoIndex[][]>(() => QUESTIONS.map(() => [0, 1, 2, 3]));
   const [mostrarPular, setMostrarPular] = useState(false);
 
-  const { play, skip, falando } = useHatAudio();
-
-  // cenário em vídeo: estático em loop eterno + vídeo de fala junto do áudio
-  useCenario(falando);
-
-  // trilha de fundo: via totalmente paralela, não influencia o cenário
-  useAmbiente(falando);
+  const { play, skip, falando, nivelVoz, progressoVoz, mudo, alternarMudo } = useHatAudio();
 
   /**
    * Trava síncrona contra cliques duplos.
@@ -81,6 +98,8 @@ export default function App() {
   /* ---------- início / reinício ---------- */
   const iniciar = useCallback(async (): Promise<void> => {
     setPlacar(placarVazio());
+    setOrdens(QUESTIONS.map(() => embaralhar([0, 1, 2, 3] as OpcaoIndex[])));
+    setApuracao(null);
     setIndice(0);
     setEscolhida(null);
     setVeredito(null);
@@ -98,13 +117,12 @@ export default function App() {
   /* =======================================================================
      APURACAO E VEREDITO FINAL
      ----------------------------------------------------------------------
-     Roda depois da ultima pergunta. definirCasa() acha a maior pontuacao,
-     junta as casas empatadas e, se houver mais de uma, sorteia com
-     Math.random() ANTES de tocar o audio do veredito.
+     Roda depois da ultima pergunta. Sem empate, vai direto ao suspense. Com
+     empate no topo o Chapeu nao sorteia: pergunta a pessoa qual das casas
+     empatadas ela prefere e so depois revela.
      ======================================================================= */
-  const finalizar = useCallback(
-    async (placarFinal: Placar): Promise<void> => {
-      const resultado = definirCasa(placarFinal);
+  const revelar = useCallback(
+    async (resultado: Veredito): Promise<void> => {
       setVeredito(resultado);
 
       await irPara("suspense");
@@ -130,13 +148,40 @@ export default function App() {
     [irPara, play]
   );
 
+  const finalizar = useCallback(
+    async (placarFinal: Placar): Promise<void> => {
+      const contagem = apurar(placarFinal);
+      const unica = contagem.empatadas.length === 1 ? contagem.empatadas[0] : undefined;
+      if (unica) {
+        await revelar(fecharVeredito(contagem, unica));
+        return;
+      }
+      setApuracao(contagem);
+      await irPara("escolha");
+      setTravada(false);
+      travadaRef.current = false;
+    },
+    [irPara, revelar]
+  );
+
+  const escolherCasa = useCallback(
+    async (casa: HouseKey): Promise<void> => {
+      if (travadaRef.current || !apuracao || !apuracao.empatadas.includes(casa)) return;
+      travadaRef.current = true;
+      setTravada(true);
+      await revelar(fecharVeredito(apuracao, casa));
+    },
+    [apuracao, revelar]
+  );
+
   /* ---------- resposta a uma alternativa ---------- */
   const responder = useCallback(
     async (opcaoIndex: OpcaoIndex): Promise<void> => {
       if (travadaRef.current) return; // tela bloqueada durante o áudio
 
       const pergunta = QUESTIONS[indice];
-      const opcao = pergunta?.opcoes[opcaoIndex];
+      const original = ordens[indice]?.[opcaoIndex];
+      const opcao = original === undefined ? undefined : pergunta?.opcoes[original];
       if (!opcao) return;
 
       travadaRef.current = true;
@@ -168,7 +213,7 @@ export default function App() {
         await finalizar(novoPlacar);
       }
     },
-    [indice, placar, play, finalizar]
+    [indice, ordens, placar, play, finalizar]
   );
 
   /* ---------- atalhos de teclado: 1-4 ou A-D ---------- */
@@ -187,10 +232,26 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [tela, responder]);
 
+  /* ---------- humor do Chapéu em cada tela ---------- */
+  const humor: Humor =
+    tela === "suspense" || tela === "escolha" ? "pensativo" : tela === "result" ? "triunfante" : "neutro";
+  const casaEscolhida =
+    tela === "question" && escolhida !== null
+      ? QUESTIONS[indice]?.opcoes[ordens[indice]?.[escolhida] ?? escolhida]?.casa
+      : undefined;
+  const vies: Humor | null = falando && casaEscolhida ? VIES_DA_CASA[casaEscolhida] : null;
+
   /* ---------- render ---------- */
   return (
     <>
-      {/* o cenário em vídeo é montado pelo useCenario, direto no <body> */}
+      {/* o Chapéu em 3D: respira parado, e fala e reage junto com o áudio */}
+      <Cenario
+        humor={humor}
+        vies={vies}
+        falando={falando}
+        lerNivel={nivelVoz}
+        lerProgresso={progressoVoz}
+      />
       <main id="app">
         <section className={`screen${visivel ? " is-active" : ""}`}>
           {tela === "start" && (
@@ -204,6 +265,7 @@ export default function App() {
           {tela === "question" && (
             <QuestionScreen
               indice={indice}
+              ordem={ordens[indice] ?? [0, 1, 2, 3]}
               escolhida={escolhida}
               travada={travada}
               falando={falando}
@@ -211,6 +273,10 @@ export default function App() {
               onResponder={(i) => void responder(i)}
               onPular={skip}
             />
+          )}
+
+          {tela === "escolha" && apuracao && (
+            <EscolhaScreen empatadas={apuracao.empatadas} onEscolher={(casa) => void escolherCasa(casa)} />
           )}
 
           {tela === "suspense" && (
@@ -226,6 +292,7 @@ export default function App() {
           )}
         </section>
       </main>
+      <ControlesTela mudo={mudo} onAlternarMudo={alternarMudo} />
     </>
   );
 }

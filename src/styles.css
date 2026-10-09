@@ -1,6 +1,6 @@
 /* =========================================================================
    O CHAPEU SELETOR - Folha de estilos
-   Layout pensado para ficar POR CIMA do video do Salao Principal:
+   Layout pensado para ficar POR CIMA da cena 3D do Salao Principal:
    conteudo no topo e na base, centro sempre livre para o Chapeu aparecer.
    ========================================================================= */
 
@@ -20,7 +20,6 @@
   --house-glow: rgba(217, 178, 90, .45);
 
   --fade: 620ms;
-  --fade-video: 200ms;
   --ease: cubic-bezier(.22, .61, .36, 1);
 
   --font-display: "Cinzel Decorative", "Cinzel", Georgia, serif;
@@ -32,9 +31,8 @@
 
 html, body, #root { height: 100%; margin: 0; }
 
-/* O cenario em video (.stage-bg) e criado pelo useCenario e fica no <body>,
-   como IRMAO do #root. Estas duas camadas garantem que ele sempre pinte
-   atras da interface. */
+/* O cenario 3D (.stage-bg) e fixo e vem antes do <main> no App. Estas duas
+   camadas garantem que ele sempre pinte atras da interface. */
 #root { position: relative; z-index: 1; }
 
 body {
@@ -75,7 +73,7 @@ img, video, svg { -webkit-user-drag: none; user-select: none; }
 body.locked { cursor: progress; }
 
 /* =========================================================================
-   CENARIO EM VIDEO
+   CENARIO 3D
    ========================================================================= */
 .stage-bg {
   position: fixed;
@@ -85,30 +83,43 @@ body.locked { cursor: progress; }
   pointer-events: none;
 }
 
-.bg-video {
+/* fundo simples: segura a tela ate a imagem parada chegar. Lembra o salao:
+   vitral azul no alto, tochas dos lados. */
+.cena-css {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-
-  /* contain = mostra o video INTEIRO, sem cortar nada.
-     Se a proporcao do video nao bater com a da janela, sobram faixas pretas.
-     (era "cover", que preenchia a tela inteira ampliando e cortando as bordas
-     - e dai vinha a sensacao de zoom) */
-  object-fit: contain;
+  background:
+    radial-gradient(14% 30% at 50% 26%, rgba(70, 110, 200, .30), transparent 72%),
+    radial-gradient(70% 45% at 50% 6%, rgba(255, 170, 90, .14), transparent 70%),
+    radial-gradient(9% 12% at 4% 44%, rgba(255, 140, 60, .30), transparent 72%),
+    radial-gradient(9% 12% at 96% 44%, rgba(255, 140, 60, .30), transparent 72%),
+    radial-gradient(30% 24% at 50% 62%, rgba(120, 80, 50, .22), transparent 75%),
+    linear-gradient(180deg, #120c08 0%, #1d140d 55%, #0b0806 100%);
 }
 
-/* o video de fala entra por cima do estatico, que segue rodando embaixo:
-   crossfade rapido, sem piscar preto entre um e outro */
-.bg-video--talk {
+.cena-parada {
+  position: absolute;
+  inset: 0;
+  background-image: var(--cena-paisagem);
+  background-position: 50% 50%;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+/* tela em pe: quadro proprio, com a aba inteira */
+@media (max-aspect-ratio: 4/5) {
+  .cena-parada { background-image: var(--cena-retrato); }
+}
+
+.cena-3d-camada {
+  position: absolute;
+  inset: 0;
   opacity: 0;
-  transition: opacity var(--fade-video) ease-in-out;
-  will-change: opacity;
+  transition: opacity 900ms ease;
 }
-.bg-video--talk.on { opacity: 1; }
+.cena-3d-camada.on { opacity: 1; }
+.cena-3d-camada canvas { display: block; }
 
-/* escurece topo e base para o texto ficar legivel sobre o video */
+/* escurece topo e base para o texto ficar legivel sobre a cena */
 .scrim {
   position: absolute;
   inset: 0;
@@ -569,6 +580,41 @@ body[data-house="corvinal"]   { --house-1: #8fb8ea; --house-2: #0e1a40; --house-
 body[data-house="lufalufa"]   { --house-1: #f5cf6d; --house-2: #726255; --house-glow: rgba(150, 115, 30, .45); }
 
 /* =========================================================================
+   CONTROLES DE SOM E TELA CHEIA (canto superior direito)
+   ========================================================================= */
+.controles-tela {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+}
+.btn-icone {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(217, 178, 90, .32);
+  border-radius: 50%;
+  background: rgba(10, 7, 4, .55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: var(--gold-soft);
+  opacity: .72;
+  cursor: pointer;
+  transition: opacity .2s ease, border-color .2s ease, background .2s ease;
+}
+.btn-icone:hover { opacity: 1; border-color: var(--gold); }
+.btn-icone:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.btn-icone[aria-pressed="true"] { background: rgba(60, 40, 14, .7); }
+
+/* =========================================================================
    RESPONSIVO
    ========================================================================= */
 /* telas baixas (projetor 16:9 pequeno): tudo mais compacto */
@@ -590,12 +636,31 @@ body[data-house="lufalufa"]   { --house-1: #f5cf6d; --house-2: #726255; --house-
   .stage { padding-left: 14px; padding-right: 14px; }
 }
 
+/* sem folga nas laterais do painel: o topo desce para os controles caberem */
+@media (max-width: 1100px) {
+  .stage { padding-top: 54px; }
+}
+@media (max-width: 760px) {
+  .eyebrow { letter-spacing: .18em; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
-  /* o crossfade dos videos continua, so que instantaneo */
-  .bg-video--talk { transition-duration: .01ms !important; }
 }
+
+/* ---------- escolha no empate ---------- */
+.escolha-sub {
+  margin: 0 0 12px;
+  text-align: center;
+  color: var(--parchment-dim, #c9b98f);
+  font-size: .95rem;
+}
+.options--escolha { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.option--casa { border-left: 3px solid var(--casa); }
+.option--casa .txt { display: grid; gap: 4px; text-align: left; }
+.option--casa strong { font-size: 1.05rem; color: var(--casa); }
+.option--casa small { font-size: .82rem; opacity: .8; line-height: 1.35; }

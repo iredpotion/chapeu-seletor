@@ -18,7 +18,7 @@ export default function StartScreen({
         </h1>
       </div>
 
-      {/* centro livre: é onde o Chapéu aparece no vídeo */}
+      {/* centro livre: é onde o Chapéu aparece */}
       <div className="stage-middle" />
 
       <div className="stage-bottom">
